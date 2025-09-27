@@ -25,7 +25,7 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import connectPg from "connect-pg-simple";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, lt } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);
 const PostgresSessionStore = connectPg(session);
@@ -60,6 +60,8 @@ export interface IStorage {
   // Amplify Task methods
   createAmplifyTask(task: { dogId: string; channel: string; expiresAt?: Date }): Promise<AmplifyTask>;
   listOpenTasks(): Promise<AmplifyTask[]>;
+  getTasksByDog(dogId: string): Promise<AmplifyTask[]>;
+  expireOldTasks(): Promise<void>;
   claimTask(taskId: string, volunteerId: string): Promise<AmplifyTask | undefined>;
   completeTask(taskId: string): Promise<AmplifyTask | undefined>;
   
@@ -204,14 +206,43 @@ export class DatabaseStorage implements IStorage {
     return newTask;
   }
 
+  async expireOldTasks(): Promise<void> {
+    // Mark tasks as expired that are past their expiration date
+    await db
+      .update(amplifyTasks)
+      .set({ status: "Expired" })
+      .where(and(
+        eq(amplifyTasks.status, "Open"),
+        lt(amplifyTasks.expiresAt, new Date())
+      ));
+  }
+
   async listOpenTasks(): Promise<AmplifyTask[]> {
+    // First expire any old tasks
+    await this.expireOldTasks();
+    
+    // Then return only truly open tasks
     return await db
       .select()
       .from(amplifyTasks)
       .where(eq(amplifyTasks.status, "Open"));
   }
 
+  async getTasksByDog(dogId: string): Promise<AmplifyTask[]> {
+    // Expire old tasks first
+    await this.expireOldTasks();
+    
+    return await db
+      .select()
+      .from(amplifyTasks)
+      .where(eq(amplifyTasks.dogId, dogId));
+  }
+
   async claimTask(taskId: string, volunteerId: string): Promise<AmplifyTask | undefined> {
+    // First expire any old tasks
+    await this.expireOldTasks();
+    
+    // Try to claim the task (will only work if still Open and not expired)
     const [updatedTask] = await db
       .update(amplifyTasks)
       .set({ volunteerId, status: "Claimed" })

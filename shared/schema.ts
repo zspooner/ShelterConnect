@@ -104,6 +104,12 @@ export const insertVolunteerSchema = createInsertSchema(volunteers).omit({
   createdAt: true,
 });
 
+export const insertAmplifyTaskSchema = createInsertSchema(amplifyTasks).omit({
+  id: true,
+  createdAt: true,
+  expiresAt: true,
+});
+
 export const insertAdoptionInquirySchema = createInsertSchema(adoptionInquiries).omit({
   id: true,
   createdAt: true,
@@ -117,6 +123,7 @@ export type Dog = typeof dogs.$inferSelect;
 export type InsertVolunteer = z.infer<typeof insertVolunteerSchema>;
 export type Volunteer = typeof volunteers.$inferSelect;
 export type PostAsset = typeof postAssets.$inferSelect;
+export type InsertAmplifyTask = z.infer<typeof insertAmplifyTaskSchema>;
 export type AmplifyTask = typeof amplifyTasks.$inferSelect;
 export type Click = typeof clicks.$inferSelect;
 export type InsertAdoptionInquiry = z.infer<typeof insertAdoptionInquirySchema>;

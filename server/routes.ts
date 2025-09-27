@@ -6,7 +6,7 @@ import { setupAuth } from "./auth";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { insertDogSchema, insertVolunteerSchema, insertAdoptionInquirySchema } from "@shared/schema";
+import { insertDogSchema, insertVolunteerSchema, insertAdoptionInquirySchema, insertAmplifyTaskSchema } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
 import { ContentGenerator } from "./content-generator";
@@ -346,6 +346,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Validation error', details: error.errors });
       }
       res.status(500).json({ error: 'Failed to submit inquiry' });
+    }
+  });
+
+  // POST /api/dogs/:id/create-tasks - Create amplify tasks for a dog
+  app.post('/api/dogs/:id/create-tasks', requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const shelterId = req.user!.id;
+      const { channels } = req.body; // Array of channel names
+      
+      const dog = await storage.getDog(id);
+      if (!dog || dog.shelterId !== shelterId) {
+        return res.status(404).json({ error: 'Dog not found' });
+      }
+      
+      // Validate channels
+      const validChannels = ['IG', 'TikTok', 'X', 'FB', 'Nextdoor'];
+      const requestedChannels = Array.isArray(channels) ? channels : [channels];
+      const invalidChannels = requestedChannels.filter(c => !validChannels.includes(c));
+      
+      if (invalidChannels.length > 0) {
+        return res.status(400).json({ 
+          error: 'Invalid channels', 
+          invalid: invalidChannels,
+          valid: validChannels 
+        });
+      }
+      
+      // Create tasks for each channel
+      const tasks = await Promise.all(
+        requestedChannels.map(channel => 
+          storage.createAmplifyTask({
+            dogId: id,
+            channel,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+          })
+        )
+      );
+      
+      res.status(201).json({ 
+        message: `Created ${tasks.length} amplify tasks`,
+        tasks 
+      });
+    } catch (error) {
+      console.error('Error creating amplify tasks:', error);
+      res.status(500).json({ error: 'Failed to create amplify tasks' });
+    }
+  });
+
+  // GET /api/dogs/:id/tasks - List amplify tasks for a specific dog
+  app.get('/api/dogs/:id/tasks', requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const shelterId = req.user!.id;
+      
+      const dog = await storage.getDog(id);
+      if (!dog || dog.shelterId !== shelterId) {
+        return res.status(404).json({ error: 'Dog not found' });
+      }
+      
+      // Get all tasks for this dog (not just open ones)
+      const tasks = await storage.getTasksByDog(id);
+      res.json(tasks);
+    } catch (error) {
+      console.error('Error listing dog tasks:', error);
+      res.status(500).json({ error: 'Failed to list dog tasks' });
     }
   });
   
