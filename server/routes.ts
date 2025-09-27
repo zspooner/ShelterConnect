@@ -281,8 +281,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Dog not found' });
       }
       
-      const shelter = await storage.getShelter(dog.shelterId);
-      const inquiries = await storage.getInquiriesByDog(dog.id);
+      const [shelter, inquiries, assets] = await Promise.all([
+        storage.getShelter(dog.shelterId),
+        storage.getInquiriesByDog(dog.id),
+        storage.getPostAssetsByDog(dog.id),
+      ]);
       
       res.json({
         ...dog,
@@ -293,6 +296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           state: shelter?.state,
         },
         inquiryCount: inquiries.length,
+        assets,
       });
     } catch (error) {
       console.error('Error getting public dog:', error);
