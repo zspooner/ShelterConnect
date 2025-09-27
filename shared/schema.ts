@@ -9,9 +9,16 @@ export const shelters = pgTable("shelters", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  phone: text("phone"),
+  address: text("address"),
   city: text("city").notNull(),
   state: text("state").notNull(),
+  zipcode: text("zipcode"),
+  website: text("website"),
+  primaryContact: text("primary_contact"),
+  description: text("description"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Dogs table
@@ -28,10 +35,12 @@ export const dogs = pgTable("dogs", {
   intakeDate: timestamp("intake_date"),
   euthanasiaRisk: boolean("euthanasia_risk").notNull().default(false),
   adoptionDeadline: timestamp("adoption_deadline"),
+  urgencyLevel: text("urgency_level").notNull().default("Medium"),
   status: text("status").notNull().default("Available"),
   photoUrl: text("photo_url").notNull(),
   slug: text("slug").notNull().unique(),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Post Assets table - for generated content
@@ -48,10 +57,15 @@ export const volunteers = pgTable("volunteers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  phone: text("phone"),
+  socialHandles: json("social_handles").default({}),
+  preferredChannels: json("preferred_channels").default([]),
+  location: text("location"),
   city: text("city"),
   state: text("state"),
   verified: boolean("verified").notNull().default(false),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Amplify Tasks table
@@ -90,18 +104,21 @@ export const adoptionInquiries = pgTable("adoption_inquiries", {
 export const insertShelterSchema = createInsertSchema(shelters).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertDogSchema = createInsertSchema(dogs).omit({
   id: true,
   slug: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertVolunteerSchema = createInsertSchema(volunteers).omit({
   id: true,
   verified: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertAmplifyTaskSchema = createInsertSchema(amplifyTasks).omit({
@@ -134,6 +151,9 @@ export const users = shelters; // Use shelters table for user auth
 export const insertUserSchema = insertShelterSchema.pick({
   email: true,
   password: true,
+  name: true,
+  city: true,
+  state: true,
 });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;

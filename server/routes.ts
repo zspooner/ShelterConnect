@@ -10,8 +10,20 @@ import { insertDogSchema, insertVolunteerSchema, insertAdoptionInquirySchema, in
 import { z } from "zod";
 import crypto from "crypto";
 import { ContentGenerator } from "./content-generator";
+import { 
+  createRateLimiters, 
+  createValidationRules, 
+  handleValidationErrors, 
+  enhanceFileUploadSecurity 
+} from "./security";
+import { runSeeding } from "./seed-data";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Get security middleware
+  const rateLimiters = createRateLimiters();
+  const validationRules = createValidationRules();
+  const fileUploadSecurity = enhanceFileUploadSecurity();
+
   // Referenced from javascript_auth_all_persistance integration
   // sets up /api/register, /api/login, /api/logout, /api/user
   setupAuth(app);
@@ -41,16 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const upload = multer({ 
     storage: storage_multer,
-    limits: {
-      fileSize: 8 * 1024 * 1024, // 8MB limit
-    },
-    fileFilter: (req, file, cb) => {
-      if (file.mimetype.startsWith('image/')) {
-        cb(null, true);
-      } else {
-        cb(new Error('Only image files are allowed'));
-      }
-    }
+    ...fileUploadSecurity
   });
 
   // Helper function to require authentication
@@ -70,7 +73,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DOG MANAGEMENT ROUTES
 
   // POST /api/dogs - Create a new dog with photo upload
-  app.post('/api/dogs', requireAuth, upload.single('photo'), async (req, res) => {
+  app.post('/api/dogs', 
+    rateLimiters.uploadLimiter, 
+    requireAuth, 
+    upload.single('photo'), 
+    async (req, res) => {
     try {
       const shelterId = req.user!.id;
       const dogData = JSON.parse(req.body.dogData || '{}');
@@ -103,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/dogs - List dogs for the authenticated shelter
-  app.get('/api/dogs', requireAuth, async (req, res) => {
+  app.get('/api/dogs', rateLimiters.generalLimiter, requireAuth, async (req, res) => {
     try {
       const shelterId = req.user!.id;
       const dogs = await storage.listDogsByShelter(shelterId);
@@ -494,6 +501,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Error completing task:', error);
       res.status(500).json({ error: 'Failed to complete task' });
     }
+  });
+
+  // DEVELOPMENT UTILITIES
+
+  // POST /api/seed-data - Initialize database with sample data (development only)
+  app.post('/api/seed-data', async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: 'Seeding not allowed in production' });
+      }
+
+      console.log('Starting database seeding...');
+      await runSeeding();
+      
+      res.json({ 
+        success: true, 
+        message: 'Database seeded successfully with sample shelters, dogs, volunteers, tasks, and inquiries' 
+      });
+    } catch (error) {
+      console.error('Seeding error:', error);
+      res.status(500).json({ 
+        error: 'Failed to seed database', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
+  });
+
+  // GET /api/health - Health check endpoint (not rate limited)
+  app.get('/health', (req, res) => {
+    res.json({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development'
+    });
   });
   
   // Serve uploaded files

@@ -1,10 +1,21 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { setupSecurityHeaders, createIpSecurityMiddleware } from "./security";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// Trust proxy for rate limiting and IP detection
+app.set("trust proxy", 1);
+
+// Setup security headers first
+setupSecurityHeaders(app);
+
+// Add IP-based security middleware
+app.use(createIpSecurityMiddleware());
+
+app.use(express.json({ limit: '10mb' })); // Limit JSON payload size
+app.use(express.urlencoded({ extended: false, limit: '10mb' })); // Limit URL-encoded payload size
 
 app.use((req, res, next) => {
   const start = Date.now();

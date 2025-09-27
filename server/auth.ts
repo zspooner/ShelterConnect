@@ -7,6 +7,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import { enhanceSessionSecurity, createRateLimiters, createValidationRules, handleValidationErrors } from "./security";
 
 declare global {
   namespace Express {
@@ -36,14 +37,14 @@ function sanitizeUser(user: any) {
 }
 
 export function setupAuth(app: Express) {
+  // Get enhanced session security configuration
+  const enhancedSessionConfig = enhanceSessionSecurity();
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET!,
-    resave: false,
-    saveUninitialized: false,
+    ...enhancedSessionConfig,
     store: storage.sessionStore,
   };
 
-  app.set("trust proxy", 1);
+  // Note: trust proxy is already set in index.ts
   app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
@@ -73,7 +74,15 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/register", async (req, res, next) => {
+  // Get rate limiters and validation rules
+  const { authLimiter } = createRateLimiters();
+  const { registrationValidation, loginValidation } = createValidationRules();
+
+  app.post("/api/register", 
+    authLimiter, 
+    registrationValidation, 
+    handleValidationErrors, 
+    async (req, res, next) => {
     try {
       const { name, email, password, city, state } = req.body;
       
@@ -102,7 +111,12 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
+  app.post("/api/login", 
+    authLimiter, 
+    loginValidation, 
+    handleValidationErrors, 
+    passport.authenticate("local"), 
+    (req, res) => {
     res.status(200).json(sanitizeUser(req.user));
   });
 

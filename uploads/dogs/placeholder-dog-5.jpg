@@ -1,0 +1,13 @@
+
+      <svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
+        <rect width="400" height="400" fill="#F4A460"/>
+        <circle cx="200" cy="150" r="30" fill="white"/>
+        <circle cx="170" cy="140" r="8" fill="black"/>
+        <circle cx="230" cy="140" r="8" fill="black"/>
+        <ellipse cx="200" cy="160" rx="6" ry="4" fill="black"/>
+        <path d="M 180 180 Q 200 200 220 180" stroke="black" stroke-width="3" fill="none"/>
+        <text x="200" y="320" text-anchor="middle" fill="white" font-size="24" font-family="Arial">
+          Placeholder Dog 5
+        </text>
+      </svg>
+    
