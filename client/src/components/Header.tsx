@@ -51,10 +51,10 @@ export default function Header({
             <Menu className="h-5 w-5" />
           </Button>
           
-          <div className="flex items-center gap-2">
+          <a href="/" className="flex items-center gap-2 hover:opacity-90" aria-label="Go to home">
             <Heart className="h-6 w-6 text-accent-foreground" />
             <h1 className="text-xl font-semibold">ShelterDog Amplify</h1>
-          </div>
+          </a>
           
           {shelterName && (
             <div className="hidden md:block text-sm text-muted-foreground">

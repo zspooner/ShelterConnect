@@ -1,4 +1,5 @@
 import { Switch, Route } from "wouter";
+import { ProtectedRoute } from "./lib/protected-route";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -19,8 +20,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/dash" component={Dashboard} />
-      <Route path="/dogs/new" component={AddDog} />
+      <ProtectedRoute path="/dash" component={Dashboard} />
+      <ProtectedRoute path="/dogs/new" component={AddDog} />
       <Route path="/amplify" component={AmplifyBoard} />
       <Route path="/auth/login" component={Login} />
       <Route path="/auth/register" component={Register} />

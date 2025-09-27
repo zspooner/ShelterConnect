@@ -5,11 +5,21 @@ import { setupSecurityHeaders, createIpSecurityMiddleware } from "./security";
 
 const app = express();
 
+// Hide tech stack header
+app.disable("x-powered-by");
+
 // Trust proxy for rate limiting and IP detection
 app.set("trust proxy", 1);
 
 // Setup security headers first
 setupSecurityHeaders(app);
+
+// Enforce required env in production
+if (app.get("env") === "production") {
+  if (!process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET is required in production");
+  }
+}
 
 // Add IP-based security middleware
 app.use(createIpSecurityMiddleware());
@@ -50,12 +60,26 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    const logPayload: any = {
+      message: err.message,
+      stack: err.stack,
+      url: req.url,
+      method: req.method,
+      timestamp: new Date().toISOString(),
+    };
+    if (process.env.NODE_ENV !== 'production') {
+      logPayload.body = req.body;
+    }
+    console.error('Server Error:', logPayload);
+    
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    res.status(status).json({ 
+      message,
+      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    });
   });
 
   // importantly only setup vite in development and after
@@ -72,11 +96,7 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  server.listen(port, () => {
     log(`serving on port ${port}`);
   });
 })();

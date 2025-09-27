@@ -228,14 +228,13 @@ export class MemStorage implements IStorage {
 
   // Post assets
   async createPostAsset(asset: { dogId: string; kind: string; payload: any }): Promise<PostAsset> {
-    const newAsset: PostAsset = {
+    const newAsset = {
       id: randomUUID(),
       dogId: asset.dogId,
-      type: asset.kind,
-      content: asset.payload,
-      fileUrl: null,
+      kind: asset.kind,
+      payload: asset.payload,
       createdAt: new Date(),
-    };
+    } as PostAsset;
     this.postAssets.set(newAsset.id, newAsset);
     return newAsset;
   }
@@ -253,7 +252,6 @@ export class MemStorage implements IStorage {
       channel: task.channel,
       status: task.status || "Open",
       shareUrl: task.shareUrl || null,
-      location: task.location,
       expiresAt: task.expiresAt ? new Date(task.expiresAt) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       createdAt: new Date(),
     };
@@ -303,13 +301,13 @@ export class MemStorage implements IStorage {
 
   // Click tracking
   async recordClick(dogId: string, source: string, ipHash: string): Promise<Click> {
-    const click: Click = {
+    const click = {
       id: randomUUID(),
       dogId,
       source,
       ipHash,
-      timestamp: new Date(),
-    };
+      createdAt: new Date(),
+    } as Click;
     this.clicks.push(click);
     return click;
   }
@@ -363,15 +361,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    // Convert to shelter data
-    const shelterData: InsertShelter = {
-      name: "New Shelter", // Will be updated during registration
-      city: "Unknown",
-      state: "Unknown",
-      ...user,
-      email: user.email || (user as any).username, // handle both email/username
-    };
-    return this.createShelter(shelterData);
+    try {
+      // Ensure all required fields are present
+      const shelterData: InsertShelter = {
+        name: user.name || "New Shelter",
+        email: user.email,
+        password: user.password,
+        city: user.city || "Unknown",
+        state: user.state || "Unknown",
+        phone: null,
+        address: null,
+        zipcode: null,
+        website: null,
+        primaryContact: null,
+        description: null,
+      };
+      
+      console.log('Creating shelter with data:', { 
+        name: shelterData.name, 
+        email: shelterData.email, 
+        city: shelterData.city, 
+        state: shelterData.state 
+      });
+      
+      const newShelter = await this.createShelter(shelterData);
+      console.log('Shelter created successfully:', newShelter.id);
+      return newShelter;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw new Error(`Failed to create user: ${error.message}`);
+    }
   }
 
   // Shelter methods

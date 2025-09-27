@@ -5,10 +5,10 @@ import fs from 'fs';
 import path from 'path';
 import emojiRegex from 'emoji-regex';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
+// Initialize OpenAI client (optional for development)
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-});
+}) : null;
 
 export interface DogProfile {
   name: string;
@@ -63,6 +63,18 @@ export class ContentGenerator {
   }> {
     const urgencyLevel = dog.euthanasiaRisk ? 'URGENT - at risk' : 
       (dog.adoptionDeadline && new Date(dog.adoptionDeadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000) ? 'time-sensitive' : 'standard';
+
+    // If OpenAI is not available, use fallback captions
+    if (!openai) {
+      const fallbackShort = `${dog.name} needs a home! ${dog.ageYears}yr ${dog.sex.toLowerCase()} ${dog.breedGuess || 'mixed breed'} in ${dog.city}, ${dog.state}. ${urgencyLevel === 'URGENT - at risk' ? 'URGENT' : 'Apply today!'}`;
+      const fallbackLong = `Meet ${dog.name}, a ${dog.ageYears}-year-old ${dog.sex.toLowerCase()} ${dog.breedGuess || 'mixed breed'} in ${dog.city}, ${dog.state}. ${dog.bio || 'Looking for a loving home!'} Contact the shelter to learn more!`;
+      
+      return {
+        shortCaption: this.removeEmojis(fallbackShort),
+        longCaption: this.removeEmojis(fallbackLong),
+        xText: this.removeEmojis(fallbackShort.slice(0, 280)),
+      };
+    }
 
     const prompt = `Create compelling adoption captions for a shelter dog with these details:
 - Name: ${dog.name}

@@ -84,16 +84,29 @@ export function setupAuth(app: Express) {
     handleValidationErrors, 
     async (req, res, next) => {
     try {
+      if (process.env.NODE_ENV !== 'production') console.log('Registration attempt with data:', {
+        name: req.body.name,
+        email: req.body.email,
+        city: req.body.city,
+        state: req.body.state
+      });
+      
       const { name, email, password, city, state } = req.body;
       
       // Check if shelter already exists
       const existingUser = await storage.getUserByUsername(email);
       if (existingUser) {
-        return res.status(400).json({ error: "Email already exists" });
+        if (process.env.NODE_ENV !== 'production') console.log('User already exists:', email);
+        return res.status(400).json({ 
+          error: "Email already exists",
+          message: "An account with this email already exists. Please use a different email or try logging in."
+        });
       }
 
       // Create shelter (which serves as user) with full details
       const hashedPassword = await hashPassword(password);
+      if (process.env.NODE_ENV !== 'production') console.log('Creating user with hashed password');
+      
       const user = await storage.createUser({
         email,
         password: hashedPassword,
@@ -102,11 +115,18 @@ export function setupAuth(app: Express) {
         state,
       });
 
+      if (process.env.NODE_ENV !== 'production') console.log('User created successfully, logging in...');
+      
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          if (process.env.NODE_ENV !== 'production') console.error('Login error after registration:', err);
+          return next(err);
+        }
+        if (process.env.NODE_ENV !== 'production') console.log('User logged in successfully');
         res.status(201).json(sanitizeUser(user));
       });
     } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('Registration error:', error);
       next(error);
     }
   });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,21 +36,69 @@ export default function Register() {
       return;
     }
 
+    // Validate required fields with specific messages
+    if (!formData.name || formData.name.length < 1) {
+      toast({
+        title: "Invalid Name",
+        description: "Please enter a shelter name (1-100 characters).",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!formData.email || !formData.email.includes('@')) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!formData.password || formData.password.length < 6) {
+      toast({
+        title: "Invalid Password",
+        description: "Password must be at least 6 characters long and contain uppercase, lowercase, and numbers.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!formData.city || formData.city.length < 1) {
+      toast({
+        title: "Invalid City",
+        description: "Please enter a city name (1-100 characters).",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!formData.state || formData.state.length < 2) {
+      toast({
+        title: "Invalid State",
+        description: "Please enter a state name (2-50 characters).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      const requestData = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        city: formData.city,
+        state: formData.state
+      };
+      
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          city: formData.city,
-          state: formData.state
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (response.ok) {
@@ -105,20 +153,20 @@ export default function Register() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Shelter Name</Label>
+                <Label htmlFor="name">Shelter Name *</Label>
                 <Input
                   id="name"
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="Your shelter name"
+                  placeholder="e.g., Happy Paws Animal Shelter"
                   required
                   data-testid="input-register-name"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -132,25 +180,25 @@ export default function Register() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
+                  <Label htmlFor="city">City *</Label>
                   <Input
                     id="city"
                     type="text"
                     value={formData.city}
                     onChange={(e) => handleInputChange('city', e.target.value)}
-                    placeholder="City"
+                    placeholder="e.g., San Francisco"
                     required
                     data-testid="input-register-city"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
+                  <Label htmlFor="state">State *</Label>
                   <Input
                     id="state"
                     type="text"
                     value={formData.state}
                     onChange={(e) => handleInputChange('state', e.target.value)}
-                    placeholder="State"
+                    placeholder="e.g., CA"
                     required
                     data-testid="input-register-state"
                   />
@@ -158,14 +206,14 @@ export default function Register() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Password *</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
-                    placeholder="Create a password"
+                    placeholder="At least 6 characters with uppercase, lowercase, and numbers"
                     required
                     data-testid="input-register-password"
                   />

@@ -6,6 +6,7 @@ import emojiRegex from 'emoji-regex';
 
 // Rate limiting configurations
 export const createRateLimiters = () => {
+  const isDev = process.env.NODE_ENV !== 'production';
   // General API rate limiter
   const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -32,6 +33,7 @@ export const createRateLimiters = () => {
     },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => isDev,
   });
 
   // File upload rate limiter
@@ -44,6 +46,7 @@ export const createRateLimiters = () => {
     },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => isDev,
   });
 
   // Public API rate limiter (for public dog pages, inquiries)
@@ -56,6 +59,7 @@ export const createRateLimiters = () => {
     },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => isDev,
   });
 
   return {
@@ -68,44 +72,49 @@ export const createRateLimiters = () => {
 
 // Security headers configuration
 export const setupSecurityHeaders = (app: Express) => {
+  const isProd = process.env.NODE_ENV === 'production';
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: [
-          "'self'", 
-          "'unsafe-inline'", // Required for styled-components and inline styles
-          "https://fonts.googleapis.com"
+          "'self'",
+          "'unsafe-inline'",
+          "https://fonts.googleapis.com",
         ],
         fontSrc: [
           "'self'",
-          "https://fonts.gstatic.com"
+          "https://fonts.gstatic.com",
         ],
         imgSrc: [
-          "'self'", 
-          "data:", // Required for base64 images
-          "blob:", // Required for canvas-generated images
-          "https:"
+          "'self'",
+          "data:",
+          "blob:",
+          "https:",
         ],
         scriptSrc: [
           "'self'",
-          "'unsafe-eval'", // Required for Vite in development
-          ...(process.env.NODE_ENV === 'development' ? ["'unsafe-inline'"] : [])
+          // Only allow eval/inline in development for Vite
+          ...(isProd ? [] : ["'unsafe-eval'", "'unsafe-inline'", "https://replit.com", "https://*.replit.com"]),
         ],
         connectSrc: [
           "'self'",
-          ...(process.env.NODE_ENV === 'development' ? ["ws:", "wss:"] : [])
+          ...(isProd ? [] : ["ws:", "wss:"]),
+          "https:",
         ],
         objectSrc: ["'none'"],
-        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+        upgradeInsecureRequests: isProd ? [] : null,
       },
     },
-    crossOriginEmbedderPolicy: false, // Disabled for development flexibility
+    crossOriginEmbedderPolicy: isProd,
     hsts: {
       maxAge: 31536000,
       includeSubDomains: true,
-      preload: true
-    }
+      preload: true,
+    },
   }));
 };
 
@@ -181,9 +190,8 @@ export const createValidationRules = () => {
     registrationValidation: [
       body('name')
         .trim()
-        .isLength({ min: 2, max: 100 })
-        .withMessage('Name must be between 2 and 100 characters')
-        .custom(noEmojis)
+        .isLength({ min: 1, max: 100 })
+        .withMessage('Name must be between 1 and 100 characters')
         .customSanitizer(sanitizeHtml),
       
       body('email')
@@ -194,8 +202,8 @@ export const createValidationRules = () => {
         .withMessage('Email must be under 254 characters'),
       
       body('password')
-        .isLength({ min: 8, max: 128 })
-        .withMessage('Password must be between 8 and 128 characters')
+        .isLength({ min: 6, max: 128 })
+        .withMessage('Password must be between 6 and 128 characters')
         .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
         .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
       
@@ -203,14 +211,12 @@ export const createValidationRules = () => {
         .trim()
         .isLength({ min: 1, max: 100 })
         .withMessage('City must be between 1 and 100 characters')
-        .custom(noEmojis)
         .customSanitizer(sanitizeHtml),
       
       body('state')
         .trim()
         .isLength({ min: 2, max: 50 })
         .withMessage('State must be between 2 and 50 characters')
-        .custom(noEmojis)
         .customSanitizer(sanitizeHtml),
     ],
 
@@ -355,7 +361,8 @@ export const enhanceSessionSecurity = () => {
     saveUninitialized: false,
     rolling: true, // Reset expiration on activity
     cookie: {
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      // Allow opting out for local dev when serving prod build over http
+      secure: process.env.NODE_ENV === 'production' && process.env.ALLOW_HTTP_SESSION !== 'true',
       httpOnly: true, // Prevent XSS attacks
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       sameSite: 'strict' as const, // CSRF protection

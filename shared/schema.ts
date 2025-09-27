@@ -1,11 +1,11 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, boolean, timestamp, json } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer, real, integer as sqliteInteger } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Shelters table - for shelter authentication
-export const shelters = pgTable("shelters", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const shelters = sqliteTable("shelters", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
@@ -17,14 +17,14 @@ export const shelters = pgTable("shelters", {
   website: text("website"),
   primaryContact: text("primary_contact"),
   description: text("description"),
-  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Dogs table
-export const dogs = pgTable("dogs", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  shelterId: varchar("shelter_id").notNull().references(() => shelters.id),
+export const dogs = sqliteTable("dogs", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  shelterId: text("shelter_id").notNull().references(() => shelters.id),
   name: text("name").notNull(),
   ageYears: real("age_years").notNull(),
   sex: text("sex").notNull(),
@@ -32,72 +32,72 @@ export const dogs = pgTable("dogs", {
   weightLbs: real("weight_lbs").notNull(),
   temperament: text("temperament").notNull(), // CSV of enums
   bio: text("bio"),
-  intakeDate: timestamp("intake_date"),
-  euthanasiaRisk: boolean("euthanasia_risk").notNull().default(false),
-  adoptionDeadline: timestamp("adoption_deadline"),
+  intakeDate: integer("intake_date", { mode: 'timestamp' }),
+  euthanasiaRisk: integer("euthanasia_risk", { mode: 'boolean' }).notNull().default(false),
+  adoptionDeadline: integer("adoption_deadline", { mode: 'timestamp' }),
   urgencyLevel: text("urgency_level").notNull().default("Medium"),
   status: text("status").notNull().default("Available"),
   photoUrl: text("photo_url").notNull(),
   slug: text("slug").notNull().unique(),
-  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Post Assets table - for generated content
-export const postAssets = pgTable("post_assets", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  dogId: varchar("dog_id").notNull().references(() => dogs.id),
+export const postAssets = sqliteTable("post_assets", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  dogId: text("dog_id").notNull().references(() => dogs.id),
   kind: text("kind").notNull(), // Caption|IGImage|StoryImage|XText
-  payload: json("payload").notNull(),
-  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  payload: text("payload", { mode: 'json' }).notNull(),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Volunteers table
-export const volunteers = pgTable("volunteers", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const volunteers = sqliteTable("volunteers", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
-  socialHandles: json("social_handles").default({}),
-  preferredChannels: json("preferred_channels").default([]),
+  socialHandles: text("social_handles", { mode: 'json' }).default({}),
+  preferredChannels: text("preferred_channels", { mode: 'json' }).default([]),
   location: text("location"),
   city: text("city"),
   state: text("state"),
-  verified: boolean("verified").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  verified: integer("verified", { mode: 'boolean' }).notNull().default(false),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Amplify Tasks table
-export const amplifyTasks = pgTable("amplify_tasks", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  dogId: varchar("dog_id").notNull().references(() => dogs.id),
-  volunteerId: varchar("volunteer_id").references(() => volunteers.id),
+export const amplifyTasks = sqliteTable("amplify_tasks", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  dogId: text("dog_id").notNull().references(() => dogs.id),
+  volunteerId: text("volunteer_id").references(() => volunteers.id),
   channel: text("channel").notNull(), // IG|TikTok|X|FB|Nextdoor
   status: text("status").notNull().default("Open"), // Open|Claimed|Done|Expired
   shareUrl: text("share_url"),
-  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-  expiresAt: timestamp("expires_at"),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  expiresAt: integer("expires_at", { mode: 'timestamp' }),
 });
 
 // Clicks table - for tracking
-export const clicks = pgTable("clicks", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  dogId: varchar("dog_id").notNull().references(() => dogs.id),
+export const clicks = sqliteTable("clicks", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  dogId: text("dog_id").notNull().references(() => dogs.id),
   source: text("source").notNull(), // IG|TikTok|X|FB|Direct|Other
   ipHash: text("ip_hash").notNull(),
-  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Adoption Inquiries table
-export const adoptionInquiries = pgTable("adoption_inquiries", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  dogId: varchar("dog_id").notNull().references(() => dogs.id),
+export const adoptionInquiries = sqliteTable("adoption_inquiries", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  dogId: text("dog_id").notNull().references(() => dogs.id),
   name: text("name").notNull(),
   email: text("email").notNull(),
   phone: text("phone"),
   message: text("message"),
-  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Insert schemas

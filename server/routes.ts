@@ -279,7 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PUBLIC ROUTES (no auth required)
   
   // GET /api/public/dogs/:slug - Get public dog profile
-  app.get('/api/public/dogs/:slug', async (req, res) => {
+  app.get('/api/public/dogs/:slug', rateLimiters.publicLimiter, async (req, res) => {
     try {
       const { slug } = req.params;
       const dog = await storage.getDogBySlug(slug);
@@ -312,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // POST /api/public/dogs/:slug/click - Track click
-  app.post('/api/public/dogs/:slug/click', async (req, res) => {
+  app.post('/api/public/dogs/:slug/click', rateLimiters.publicLimiter, async (req, res) => {
     try {
       const { slug } = req.params;
       const { source } = req.body;
@@ -334,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // POST /api/public/dogs/:slug/inquire - Submit adoption inquiry
-  app.post('/api/public/dogs/:slug/inquire', async (req, res) => {
+  app.post('/api/public/dogs/:slug/inquire', rateLimiters.publicLimiter, async (req, res) => {
     try {
       const { slug } = req.params;
       const inquiryData = req.body;
@@ -429,7 +429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // VOLUNTEER ROUTES
   
   // GET /api/tasks - List open amplify tasks
-  app.get('/api/tasks', async (req, res) => {
+  app.get('/api/tasks', rateLimiters.publicLimiter, async (req, res) => {
     try {
       const tasks = await storage.listOpenTasks();
       
@@ -460,7 +460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // POST /api/tasks/:id/claim - Claim a task
-  app.post('/api/tasks/:id/claim', async (req, res) => {
+  app.post('/api/tasks/:id/claim', rateLimiters.publicLimiter, async (req, res) => {
     try {
       const { id } = req.params;
       const { volunteerEmail, name } = req.body;
@@ -487,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // POST /api/tasks/:id/done - Mark task as complete
-  app.post('/api/tasks/:id/done', async (req, res) => {
+  app.post('/api/tasks/:id/done', rateLimiters.publicLimiter, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -540,8 +540,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Serve uploaded files
   app.use('/uploads', (req, res, next) => {
-    // Add CORS headers for image serving
-    res.header('Access-Control-Allow-Origin', '*');
+    // Add liberal CORS headers in development only
+    if (process.env.NODE_ENV !== 'production') {
+      res.header('Access-Control-Allow-Origin', '*');
+    }
     next();
   });
   
