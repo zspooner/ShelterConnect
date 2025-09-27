@@ -28,7 +28,7 @@ interface Dog {
 export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const { user, isLoading: userLoading } = useAuth();
+  const { user, isLoading: userLoading, logoutMutation } = useAuth();
 
   // Fetch dogs for the authenticated shelter
   const { data: dogs = [], isLoading: dogsLoading, error } = useQuery<Dog[]>({
@@ -111,6 +111,7 @@ export default function Dashboard() {
         shelterName={user?.name || 'Your Shelter'}
         isLoggedIn={true}
         userType="shelter"
+        onLogout={() => logoutMutation.mutate()}
       />
       
       <main className="max-w-6xl mx-auto p-6 space-y-8">
