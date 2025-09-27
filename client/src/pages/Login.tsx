@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Heart, Eye, EyeOff } from "lucide-react";
+import { Heart, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -11,6 +12,7 @@ export default function Login() {
     password: ""
   });
   const [showPassword, setShowPassword] = useState(false);
+  const { loginMutation } = useAuth();
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -18,11 +20,11 @@ export default function Login() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login submitted:', formData);
-    // Simulate login success
-    setTimeout(() => {
-      window.location.href = "/dash";
-    }, 1000);
+    loginMutation.mutate(formData, {
+      onSuccess: () => {
+        window.location.href = "/dash";
+      }
+    });
   };
 
   const handleRegisterClick = () => {
@@ -94,9 +96,17 @@ export default function Login() {
                 type="submit" 
                 className="w-full" 
                 size="lg"
+                disabled={loginMutation.isPending}
                 data-testid="button-login"
               >
-                Sign In
+                {loginMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
               </Button>
             </form>
           </CardContent>

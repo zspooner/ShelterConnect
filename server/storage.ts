@@ -112,7 +112,7 @@ export class MemStorage implements IStorage {
       id: randomUUID(),
       name: user.name,
       email: user.email,
-      password: user.passwordHash,
+      password: user.password,
       city: user.city,
       state: user.state,
       createdAt: new Date(),

@@ -29,6 +29,12 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+// Sanitize user data before sending to client
+function sanitizeUser(user: any) {
+  const { password, ...sanitizedUser } = user;
+  return sanitizedUser;
+}
+
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET!,
@@ -89,7 +95,7 @@ export function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(user);
+        res.status(201).json(sanitizeUser(user));
       });
     } catch (error) {
       next(error);
@@ -97,7 +103,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+    res.status(200).json(sanitizeUser(req.user));
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -109,7 +115,7 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+    res.json(sanitizeUser(req.user));
   });
 }
 
