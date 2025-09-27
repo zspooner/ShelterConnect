@@ -102,18 +102,20 @@ export class MemStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     for (const user of this.users.values()) {
-      if (user.username === username) return user;
+      if (user.email === username) return user; // Look up by email since User = Shelter
     }
     return undefined;
   }
 
-  async createUser(user: InsertUser): Promise<User> {
+  async createUser(user: any): Promise<User> {
     const newUser: User = {
       id: randomUUID(),
-      username: user.username,
-      passwordHash: user.passwordHash,
+      name: user.name,
+      email: user.email,
+      password: user.passwordHash,
+      city: user.city,
+      state: user.state,
       createdAt: new Date(),
-      updatedAt: new Date(),
     };
     this.users.set(newUser.id, newUser);
     return newUser;
