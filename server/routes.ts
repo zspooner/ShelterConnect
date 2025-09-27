@@ -9,6 +9,7 @@ import fs from "fs";
 import { insertDogSchema, insertVolunteerSchema, insertAdoptionInquirySchema } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
+import { ContentGenerator } from "./content-generator";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Referenced from javascript_auth_all_persistance integration
@@ -175,43 +176,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Dog not found' });
       }
       
-      // For now, create placeholder content - will implement actual generation in next task
+      // Check if content already exists to avoid duplicates
+      const existingAssets = await storage.getPostAssetsByDog(id);
+      if (existingAssets.length > 0) {
+        return res.json({ message: 'Content already exists for this dog', assets: existingAssets });
+      }
+      
       const shelter = await storage.getShelter(shelterId);
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const publicUrl = `${baseUrl}/dog/${dog.slug}`;
       
-      // Create sample captions
-      const shortCaption = `Meet ${dog.name}, a ${dog.ageYears}-year-old ${dog.sex} ${dog.breedGuess || 'mixed breed'}. ${dog.temperament}. In ${shelter?.city}, ${shelter?.state}. Adopt by ${dog.adoptionDeadline?.toDateString() || 'soon'} → link`;
-      
-      const longCaption = `${shortCaption}\n\n${dog.bio || `${dog.name} is looking for a loving home! This sweet ${dog.sex.toLowerCase()} is great with people and ready to be your new best friend.`}\n\nContact ${shelter?.email} or visit our page to learn more!`;
-      
-      const xText = shortCaption.slice(0, 280); // Truncate for X/Twitter
+      // Create content generator and generate all content
+      const contentGenerator = new ContentGenerator();
+      const content = await contentGenerator.generateAllContent({
+        name: dog.name,
+        sex: dog.sex as 'Male' | 'Female',
+        ageYears: dog.ageYears,
+        breedGuess: dog.breedGuess || undefined,
+        temperament: dog.temperament || undefined,
+        bio: dog.bio || undefined,
+        euthanasiaRisk: dog.euthanasiaRisk,
+        adoptionDeadline: dog.adoptionDeadline || undefined,
+        shelterName: shelter?.name,
+        city: shelter?.city,
+        state: shelter?.state,
+        photoUrl: dog.photoUrl,
+        publicUrl
+      });
       
       // Create content assets
       await Promise.all([
         storage.createPostAsset({
           dogId: id,
           kind: 'Caption',
-          payload: { text: shortCaption, type: 'short' }
+          payload: { text: content.shortCaption, type: 'short' }
         }),
         storage.createPostAsset({
           dogId: id,
           kind: 'Caption', 
-          payload: { text: longCaption, type: 'long' }
+          payload: { text: content.longCaption, type: 'long' }
         }),
         storage.createPostAsset({
           dogId: id,
           kind: 'XText',
-          payload: { text: xText }
+          payload: { text: content.xText }
         }),
-        // Placeholder for images - will implement in next task
         storage.createPostAsset({
           dogId: id,
           kind: 'IGImage',
-          payload: { url: '/placeholder-ig-image.png', type: 'square' }
+          payload: { url: content.instagramImageUrl, type: 'square' }
         }),
         storage.createPostAsset({
           dogId: id,
           kind: 'StoryImage',
-          payload: { url: '/placeholder-story-image.png', type: 'story' }
+          payload: { url: content.storyImageUrl, type: 'story' }
+        }),
+        storage.createPostAsset({
+          dogId: id,
+          kind: 'QRCode',
+          payload: { url: content.qrCodeUrl, linkTo: publicUrl }
         })
       ]);
       
@@ -225,7 +248,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      res.json({ message: 'Content generated successfully' });
+      res.json({ 
+        message: 'Content generated successfully',
+        content: {
+          captions: {
+            short: content.shortCaption,
+            long: content.longCaption,
+            x: content.xText
+          },
+          images: {
+            instagram: content.instagramImageUrl,
+            story: content.storyImageUrl,
+            qrCode: content.qrCodeUrl
+          }
+        }
+      });
     } catch (error) {
       console.error('Error generating content:', error);
       res.status(500).json({ error: 'Failed to generate content' });
