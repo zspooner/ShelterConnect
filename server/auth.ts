@@ -81,7 +81,7 @@ export function setupAuth(app: Express) {
       const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
         email,
-        passwordHash: hashedPassword,
+        password: hashedPassword,
         name,
         city,
         state,
