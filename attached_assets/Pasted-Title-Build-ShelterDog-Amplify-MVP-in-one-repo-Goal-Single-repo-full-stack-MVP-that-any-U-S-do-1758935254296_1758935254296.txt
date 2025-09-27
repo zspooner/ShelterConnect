@@ -1,0 +1,397 @@
+Title: Build “ShelterDog Amplify” MVP in one repo
+
+Goal
+
+Single-repo full-stack MVP that any U.S. dog shelter can use to upload one dog profile and auto-produce shareable content and a public page.
+
+Volunteer queue to boost reach.
+
+Works in Replit without external services by default. Optional OpenAI key enables better copy.
+
+Stack
+
+Backend: Node 20, Express, Prisma ORM, SQLite (file db), JWT auth.
+
+Frontend: React + Vite + TypeScript + TailwindCSS.
+
+File storage: local /uploads directory. Use Multer for images.
+
+Env: JWT_SECRET, OPENAI_API_KEY (optional).
+
+Build scripts: dev runs both client and server with concurrent, db:push, db:seed.
+
+Core objects
+
+Shelter: id, name, email (unique), password hash, city, state, createdAt.
+
+Dog: id, shelterId, name, ageYears (number), sex, breedGuess, weightLbs, temperament (enum: Calm|Active|GoodWithDogs|GoodWithKids|SpecialNeeds), bio, intakeDate, euthanasiaRisk (boolean), adoptionDeadline (date), status (enum: Available|Adopted|Hold|Urgent), photoUrl, createdAt, slug.
+
+PostAsset: id, dogId, kind (enum: Caption|IGImage|StoryImage|XText), payload (json), createdAt.
+
+Volunteer: id, name, email, city, state, createdAt, verified (boolean).
+
+AmplifyTask: id, dogId, volunteerId (nullable), channel (enum: IG|TikTok|X|FB|Nextdoor), status (enum: Open|Claimed|Done|Expired), shareUrl, createdAt, expiresAt.
+
+Click: id, dogId, source (enum: IG|TikTok|X|FB|Direct|Other), createdAt, ipHash.
+
+AdoptionInquiry: id, dogId, name, email, phone, message, createdAt.
+
+User roles and auth
+
+Shelter account: email + password. JWT cookies. Basic reset flow not required in MVP.
+
+Volunteer: email only. Magic code emailed is out-of-scope; use simple email entry with checkbox “I agree to be contacted” and immediate create (no auth).
+
+Flows
+
+Shelter creates account and logs in.
+
+Shelter uploads dog: image, basic facts, optional adoption deadline and risk flag.
+
+System generates:
+
+Public dog page at /d/:slug with hero image, urgency badge, share buttons, inquiry form, QR code.
+
+Social assets:
+
+Two captions (short and long) with urgency and contact line.
+
+An IG square PNG with dog name, photo, “Adopt me,” deadline, QR code to public page.
+
+A Story PNG variant.
+
+X post text ≤280 chars.
+
+Amplify tasks for IG, X, FB, Nextdoor with prefilled text and links.
+
+Volunteers can browse /amplify and “Claim” a task. On claim, show copy blocks and image download links.
+
+Public page tracks share clicks and inquiry submissions.
+
+AI + fallback
+
+If OPENAI_API_KEY present, use GPT for caption variants with urgency. If absent, use rule-based templates.
+
+Pages (frontend)
+
+/ marketing splash + CTA: “For shelters” and “Volunteer”.
+
+/auth/login and /auth/register.
+
+/dash shelter dashboard. List dogs with status badges and click metrics.
+
+/dogs/new create form with live preview.
+
+/dogs/:id/assets list generated assets and download buttons.
+
+/amplify volunteer task board with filters by location and channel.
+
+/d/:slug public dog page with inquiry form.
+
+/thanks confirmation for inquiry.
+
+API routes (backend)
+
+POST /api/auth/register {name,email,password}.
+
+POST /api/auth/login {email,password}.
+
+GET /api/me returns shelter profile.
+
+POST /api/dogs multipart form: photo + json fields.
+
+GET /api/dogs list by shelter.
+
+GET /api/dogs/:id details including assets and clicks summary.
+
+POST /api/dogs/:id/generate generate captions + images + tasks.
+
+GET /api/public/dogs/:slug public details.
+
+POST /api/public/dogs/:slug/click {source}.
+
+POST /api/public/dogs/:slug/inquire {name,email,phone,message}.
+
+GET /api/tasks list open tasks (public).
+
+POST /api/tasks/:id/claim {volunteerEmail, name}.
+
+POST /api/tasks/:id/done simple toggle.
+
+GET /api/assets/:assetId serve generated images or text payloads.
+
+Generation requirements
+
+Captions include: dog name, age, temperament highlights, city/state, “Urgent if applicable,” deadline date like “Adopt by Oct 3,” and contact line “Email [shelter email] or tap link.”
+
+Image generation: server-side Canvas using node-canvas.
+
+Square 1080×1080 and Story 1080×1920.
+
+Layout: blurred photo background, centered cutout rectangle, bold name, badges (Age, Weight, Temperament), red “URGENT” ribbon if euthanasiaRisk true or deadline within 7 days, QR code to /d/:slug (use qrcode package).
+
+Export PNG files into /uploads/assets.
+
+Slug format: name-city-state-xxxx where xxxx is 4-char id.
+
+Deadlines: compute urgency level: None (>14d), Soon (7–14d), Critical (≤7d). Badge color: gray, yellow, red.
+
+Data and metrics
+
+Count a click when POST /api/public/dogs/:slug/click called with a source. Store ip hash using SHA-256(ip + salt) to reduce repeats within 24h.
+
+Dashboard shows per-dog: views, clicks by channel, inquiries. Simple 7-day sparkline with counts aggregated daily.
+
+Validation
+
+Required dog fields: name, ageYears, sex, weightLbs, city/state via shelter, photo.
+
+Image size limit 8 MB. Accept jpg/png.
+
+Design
+
+Tailwind. Clean cards. Status chips.
+
+Color tokens: primary slate, accent emerald, warning yellow, danger red.
+
+Buttons to copy caption text and download images.
+
+Security and constraints
+
+Limit upload MIME types to images.
+
+Rate-limit public click and inquiry endpoints with simple in-memory limiter.
+
+Store JWT in httpOnly cookie.
+
+Project structure
+
+/server
+  index.ts
+  prisma/schema.prisma
+  src/
+    env.ts
+    auth/
+      hash.ts
+      jwt.ts
+      routes.ts
+    dogs/
+      routes.ts
+      generate.ts
+      image.ts
+      qr.ts
+    tasks/routes.ts
+    public/routes.ts
+    mail/notify.ts (stub; console.log in MVP)
+  uploads/ (gitignored)
+/web
+  index.html
+  vite.config.ts
+  src/
+    main.tsx
+    App.tsx
+    lib/api.ts
+    components/
+      FormField.tsx
+      Badge.tsx
+      Stat.tsx
+    pages/
+      Home.tsx
+      Login.tsx
+      Register.tsx
+      Dashboard.tsx
+      DogNew.tsx
+      DogAssets.tsx
+      Amplify.tsx
+      PublicDog.tsx
+      Thanks.tsx
+  tailwind.config.cjs
+.env.example
+package.json
+README.md
+
+
+Prisma schema sketch
+
+model Shelter {
+  id        String  @id @default(cuid())
+  name      String
+  email     String  @unique
+  password  String
+  city      String
+  state     String
+  createdAt DateTime @default(now())
+  dogs      Dog[]
+}
+
+model Dog {
+  id             String  @id @default(cuid())
+  shelterId      String
+  shelter        Shelter @relation(fields: [shelterId], references: [id])
+  name           String
+  ageYears       Float
+  sex            String
+  breedGuess     String?
+  weightLbs      Float
+  temperament    String   // CSV of enums for simplicity
+  bio            String?
+  intakeDate     DateTime? 
+  euthanasiaRisk Boolean   @default(false)
+  adoptionDeadline DateTime?
+  status         String    @default("Available")
+  photoUrl       String
+  slug           String    @unique
+  createdAt      DateTime  @default(now())
+  assets         PostAsset[]
+  clicks         Click[]
+  inquiries      AdoptionInquiry[]
+  tasks          AmplifyTask[]
+}
+
+model PostAsset {
+  id        String  @id @default(cuid())
+  dogId     String
+  dog       Dog     @relation(fields: [dogId], references: [id])
+  kind      String
+  payload   Json
+  createdAt DateTime @default(now())
+}
+
+model Volunteer {
+  id        String  @id @default(cuid())
+  name      String
+  email     String  @unique
+  city      String?
+  state     String?
+  verified  Boolean @default(false)
+  createdAt DateTime @default(now())
+  tasks     AmplifyTask[]
+}
+
+model AmplifyTask {
+  id        String  @id @default(cuid())
+  dogId     String
+  dog       Dog     @relation(fields: [dogId], references: [id])
+  volunteerId String?
+  volunteer  Volunteer? @relation(fields: [volunteerId], references: [id])
+  channel   String
+  status    String   @default("Open")
+  shareUrl  String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+}
+
+model Click {
+  id        String  @id @default(cuid())
+  dogId     String
+  dog       Dog     @relation(fields: [dogId], references: [id])
+  source    String
+  ipHash    String
+  createdAt DateTime @default(now())
+}
+
+model AdoptionInquiry {
+  id        String  @id @default(cuid())
+  dogId     String
+  dog       Dog     @relation(fields: [dogId], references: [id])
+  name      String
+  email     String
+  phone     String?
+  message   String?
+  createdAt DateTime @default(now())
+}
+
+
+Commands
+
+Server package.json scripts:
+
+dev: tsx watch server/index.ts
+
+db:push: prisma db push
+
+db:seed: tsx server/src/seed.ts
+
+Web package.json scripts:
+
+dev: vite
+
+Root scripts:
+
+dev: concurrently -k -n web,api "npm:dev:web" "npm:dev:api"
+
+dev:web: npm --prefix web run dev
+
+dev:api: npm --prefix server run dev
+
+Key implementation notes
+
+Image pipeline: use multer to accept upload, save to /uploads/dogs/<id>.jpg. node-canvas composes PNGs for assets. qrcode generates QR buffers. Save assets to /uploads/assets/<assetId>.png. Expose via GET /api/assets/:id.
+
+Caption generator:
+
+If OPENAI_API_KEY set, call gpt-4o-mini or similar with a fixed prompt including dog facts and deadline.
+
+Else produce:
+
+Short: “Meet {Name}, {ageYears}-yo {sex} {breedGuess}. {temperament highlights}. In {city}, {state}. Adopt by {deadlineFmt} → {publicUrl}”
+
+Long: add 2 sentences about personality and CTA.
+
+X variant ≤280 chars.
+
+Slugging: lowercased, alnum + hyphens. Ensure uniqueness by appending 4-char id suffix.
+
+Public page: OG tags for sharing. Prominent CTA buttons. Show deadline countdown when set. Inquiry form posts to API and shows /thanks.
+
+Acceptance criteria
+
+Create shelter, add dog with photo, click “Generate,” see:
+
+Two captions, one X post, two PNGs, and four open tasks.
+
+Public page loads at /d/:slug with QR code matching URL.
+
+Volunteer can claim a task and mark done.
+
+Dashboard shows clicks increase when calling click endpoint.
+
+No external services required. Optional OpenAI improves copy.
+
+Code is typed, linted, and in one repo. README includes setup.
+
+Packages to add
+
+Server: express cors cookie-parser multer jsonwebtoken bcrypt zod prisma @prisma/client node-canvas qrcode nanoid date-fns morgan helmet rate-limiter-flexible dotenv tsx
+
+Web: react react-dom react-router-dom axios jotai clsx tailwindcss postcss autoprefixer
+
+Dev: typescript ts-node @types/* concurrently
+
+README quick start
+
+Install.
+
+Copy .env.example to .env and set JWT_SECRET, optional OPENAI_API_KEY.
+
+npm run db:push then npm run dev.
+
+Register shelter, upload a dog, generate assets, share public link.
+
+Stretch (if time allows)
+
+CSV bulk import for dogs.
+
+Simple export of a one-page PDF flyer per dog.
+
+Basic email notification to shelter on inquiry (console log in MVP).
+
+i18n captions (English/Spanish toggle).
+
+Deliverables
+
+Working Replit project with above features.
+
+Clean UI with Tailwind.
+
+Seed script that creates one demo shelter and one sample dog.
