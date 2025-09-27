@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import AddDog from "@/pages/AddDog";
 import AmplifyBoard from "@/pages/AmplifyBoard";
 import Login from "@/pages/Login";
+import Register from "@/pages/Register";
 import PublicDogPage from "@/pages/PublicDogPage";
 import NotFound from "@/pages/not-found";
 
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/dogs/new" component={AddDog} />
       <Route path="/amplify" component={AmplifyBoard} />
       <Route path="/auth/login" component={Login} />
+      <Route path="/auth/register" component={Register} />
       <Route path="/d/:slug" component={PublicDogPage} />
       <Route component={NotFound} />
     </Switch>
