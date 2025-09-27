@@ -7,7 +7,7 @@ export default function Home() {
   const handleGetStarted = (type: "shelter" | "volunteer") => {
     console.log(`Get started clicked: ${type}`);
     if (type === "shelter") {
-      window.location.href = "/auth/register";
+      window.location.href = "/auth/login";
     } else {
       window.location.href = "/amplify";
     }

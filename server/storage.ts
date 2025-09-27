@@ -77,6 +77,269 @@ export interface IStorage {
   sessionStore: session.Store;
 }
 
+// In-memory storage implementation for development
+export class MemStorage implements IStorage {
+  public sessionStore: session.Store;
+  private users: Map<string, User> = new Map();
+  private shelters: Map<string, Shelter> = new Map();
+  private dogs: Map<string, Dog> = new Map();
+  private volunteers: Map<string, Volunteer> = new Map();
+  private postAssets: Map<string, PostAsset> = new Map();
+  private amplifyTasks: Map<string, AmplifyTask> = new Map();
+  private clicks: Click[] = [];
+  private adoptionInquiries: AdoptionInquiry[] = [];
+
+  constructor() {
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
+    });
+  }
+
+  // Auth methods
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    for (const user of this.users.values()) {
+      if (user.username === username) return user;
+    }
+    return undefined;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const newUser: User = {
+      id: randomUUID(),
+      username: user.username,
+      passwordHash: user.passwordHash,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(newUser.id, newUser);
+    return newUser;
+  }
+
+  // Shelter methods
+  async getShelter(id: string): Promise<Shelter | undefined> {
+    return this.shelters.get(id);
+  }
+
+  async getShelterByEmail(email: string): Promise<Shelter | undefined> {
+    for (const shelter of this.shelters.values()) {
+      if (shelter.email === email) return shelter;
+    }
+    return undefined;
+  }
+
+  async createShelter(shelter: InsertShelter): Promise<Shelter> {
+    const newShelter: Shelter = {
+      id: randomUUID(),
+      name: shelter.name,
+      email: shelter.email,
+      phone: shelter.phone || null,
+      address: shelter.address || null,
+      city: shelter.city || null,
+      state: shelter.state || null,
+      zipcode: shelter.zipcode || null,
+      website: shelter.website || null,
+      primaryContact: shelter.primaryContact || null,
+      description: shelter.description || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.shelters.set(newShelter.id, newShelter);
+    return newShelter;
+  }
+
+  // Dog methods
+  async createDog(dog: InsertDog): Promise<Dog> {
+    const newDog: Dog = {
+      id: randomUUID(),
+      shelterId: dog.shelterId,
+      name: dog.name,
+      slug: dog.slug,
+      ageYears: dog.ageYears,
+      sex: dog.sex,
+      breedGuess: dog.breedGuess,
+      weightLbs: dog.weightLbs,
+      temperament: dog.temperament,
+      bio: dog.bio,
+      photoUrl: dog.photoUrl,
+      adoptionDeadline: dog.adoptionDeadline ? new Date(dog.adoptionDeadline) : null,
+      euthanasiaRisk: dog.euthanasiaRisk,
+      urgencyLevel: dog.urgencyLevel || "Medium",
+      status: dog.status || "Available",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.dogs.set(newDog.id, newDog);
+    return newDog;
+  }
+
+  async getDog(id: string): Promise<Dog | undefined> {
+    return this.dogs.get(id);
+  }
+
+  async getDogBySlug(slug: string): Promise<Dog | undefined> {
+    for (const dog of this.dogs.values()) {
+      if (dog.slug === slug) return dog;
+    }
+    return undefined;
+  }
+
+  async listDogsByShelter(shelterId: string): Promise<Dog[]> {
+    return Array.from(this.dogs.values()).filter(dog => dog.shelterId === shelterId);
+  }
+
+  async updateDog(id: string, updates: Partial<Dog>): Promise<Dog | undefined> {
+    const dog = this.dogs.get(id);
+    if (!dog) return undefined;
+    
+    const updatedDog = { ...dog, ...updates, updatedAt: new Date() };
+    this.dogs.set(id, updatedDog);
+    return updatedDog;
+  }
+
+  // Volunteer methods
+  async createVolunteer(volunteer: InsertVolunteer): Promise<Volunteer> {
+    const newVolunteer: Volunteer = {
+      id: randomUUID(),
+      name: volunteer.name,
+      email: volunteer.email,
+      phone: volunteer.phone || null,
+      socialHandles: volunteer.socialHandles || {},
+      preferredChannels: volunteer.preferredChannels || [],
+      location: volunteer.location || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.volunteers.set(newVolunteer.id, newVolunteer);
+    return newVolunteer;
+  }
+
+  async getVolunteerByEmail(email: string): Promise<Volunteer | undefined> {
+    for (const volunteer of this.volunteers.values()) {
+      if (volunteer.email === email) return volunteer;
+    }
+    return undefined;
+  }
+
+  // Post assets
+  async createPostAsset(asset: { dogId: string; kind: string; payload: any }): Promise<PostAsset> {
+    const newAsset: PostAsset = {
+      id: randomUUID(),
+      dogId: asset.dogId,
+      type: asset.kind,
+      content: asset.payload,
+      fileUrl: null,
+      createdAt: new Date(),
+    };
+    this.postAssets.set(newAsset.id, newAsset);
+    return newAsset;
+  }
+
+  async getPostAssetsByDog(dogId: string): Promise<PostAsset[]> {
+    return Array.from(this.postAssets.values()).filter(asset => asset.dogId === dogId);
+  }
+
+  // Amplify tasks
+  async createAmplifyTask(task: Omit<AmplifyTask, 'id' | 'createdAt'>): Promise<AmplifyTask> {
+    const newTask: AmplifyTask = {
+      id: randomUUID(),
+      dogId: task.dogId,
+      volunteerId: task.volunteerId || null,
+      channel: task.channel,
+      status: task.status || "Open",
+      shareUrl: task.shareUrl || null,
+      location: task.location,
+      expiresAt: task.expiresAt ? new Date(task.expiresAt) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      createdAt: new Date(),
+    };
+    this.amplifyTasks.set(newTask.id, newTask);
+    return newTask;
+  }
+
+  async expireOldTasks(): Promise<void> {
+    const now = new Date();
+    for (const [id, task] of this.amplifyTasks.entries()) {
+      if (task.expiresAt && task.expiresAt < now && task.status === "Claimed") {
+        task.status = "Open";
+        task.volunteerId = null;
+      }
+    }
+  }
+
+  async listOpenTasks(): Promise<AmplifyTask[]> {
+    await this.expireOldTasks();
+    return Array.from(this.amplifyTasks.values()).filter(task => task.status === "Open");
+  }
+
+  async listTasksByVolunteer(volunteerId: string): Promise<AmplifyTask[]> {
+    return Array.from(this.amplifyTasks.values()).filter(task => task.volunteerId === volunteerId);
+  }
+
+  async getTasksByDog(dogId: string): Promise<AmplifyTask[]> {
+    return Array.from(this.amplifyTasks.values()).filter(task => task.dogId === dogId);
+  }
+
+  async claimTask(taskId: string, volunteerId: string): Promise<AmplifyTask | undefined> {
+    const task = this.amplifyTasks.get(taskId);
+    if (!task || task.status !== "Open") return undefined;
+    
+    task.status = "Claimed";
+    task.volunteerId = volunteerId;
+    return task;
+  }
+
+  async completeTask(taskId: string): Promise<AmplifyTask | undefined> {
+    const task = this.amplifyTasks.get(taskId);
+    if (!task || task.status !== "Claimed") return undefined;
+    
+    task.status = "Done";
+    return task;
+  }
+
+  // Click tracking
+  async recordClick(dogId: string, source: string, ipHash: string): Promise<Click> {
+    const click: Click = {
+      id: randomUUID(),
+      dogId,
+      source,
+      ipHash,
+      timestamp: new Date(),
+    };
+    this.clicks.push(click);
+    return click;
+  }
+
+  async getClicksByDog(dogId: string): Promise<Click[]> {
+    return this.clicks.filter(click => click.dogId === dogId);
+  }
+
+  // Adoption inquiries
+  async createInquiry(inquiry: InsertAdoptionInquiry): Promise<AdoptionInquiry> {
+    const newInquiry: AdoptionInquiry = {
+      id: randomUUID(),
+      dogId: inquiry.dogId,
+      name: inquiry.name,
+      email: inquiry.email,
+      phone: inquiry.phone || null,
+      message: inquiry.message || null,
+      createdAt: new Date(),
+    };
+    this.adoptionInquiries.push(newInquiry);
+    return newInquiry;
+  }
+
+  async getInquiriesByDog(dogId: string): Promise<AdoptionInquiry[]> {
+    return this.adoptionInquiries.filter(inquiry => inquiry.dogId === dogId);
+  }
+
+  getSessionStore(): session.Store {
+    return this.sessionStore;
+  }
+}
+
 // Referenced from javascript_database integration
 export class DatabaseStorage implements IStorage {
   public sessionStore: session.Store;
@@ -286,4 +549,4 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();
