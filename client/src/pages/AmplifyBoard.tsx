@@ -1,96 +1,133 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Users } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Search, Filter, Users, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import TaskCard from "@/components/TaskCard";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+
+interface Task {
+  id: string;
+  dogId: string;
+  volunteerId?: string;
+  channel: string;
+  status: string;
+  shareUrl?: string;
+  createdAt: string;
+  expiresAt: string;
+  dog?: {
+    name: string;
+    photoUrl: string;
+    urgencyLevel: string;
+  };
+  location: string;
+}
 
 export default function AmplifyBoard() {
-  //todo: remove mock functionality
   const [searchTerm, setSearchTerm] = useState("");
   const [channelFilter, setChannelFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
 
-  const mockTasks = [
-    {
-      id: "1",
-      dogName: "Buddy",
-      dogPhoto: "https://images.unsplash.com/photo-1552053831-71594a27632d?w=100&h=100&fit=crop",
-      channel: "IG" as const,
-      status: "Open" as const,
-      location: "Austin, TX",
-      expiresAt: "in 2 days",
-      urgencyLevel: "Critical" as const
+  // Fetch tasks from API
+  const { data: tasks = [], isLoading, error } = useQuery<Task[]>({
+    queryKey: ['/api/tasks'],
+    refetchInterval: 30000, // Refetch every 30 seconds to keep data fresh
+  });
+
+  // Mutations for task actions
+  const claimTaskMutation = useMutation({
+    mutationFn: async ({ taskId, volunteerEmail, name }: { taskId: string; volunteerEmail: string; name: string }) => {
+      return apiRequest('POST', `/api/tasks/${taskId}/claim`, { volunteerEmail, name });
     },
-    {
-      id: "2",
-      dogName: "Luna",
-      dogPhoto: "https://images.unsplash.com/photo-1551717743-49959800b1f6?w=100&h=100&fit=crop",
-      channel: "X" as const,
-      status: "Claimed" as const,
-      location: "Austin, TX",
-      expiresAt: "in 4 days",
-      claimedBy: "Sarah M."
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
     },
-    {
-      id: "3",
-      dogName: "Max",
-      dogPhoto: "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=100&h=100&fit=crop",
-      channel: "FB" as const,
-      status: "Open" as const,
-      location: "San Antonio, TX",
-      expiresAt: "in 3 days"
+  });
+
+  const completeTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      return apiRequest('POST', `/api/tasks/${taskId}/done`);
     },
-    {
-      id: "4",
-      dogName: "Bella",
-      dogPhoto: "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=100&h=100&fit=crop",
-      channel: "TikTok" as const,
-      status: "Done" as const,
-      location: "Dallas, TX",
-      expiresAt: "yesterday"
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
     },
-    {
-      id: "5",
-      dogName: "Rocky",
-      dogPhoto: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=100&h=100&fit=crop",
-      channel: "Nextdoor" as const,
-      status: "Open" as const,
-      location: "Houston, TX",
-      expiresAt: "in 5 days",
-      urgencyLevel: "Soon" as const
-    },
-    {
-      id: "6",
-      dogName: "Daisy",
-      dogPhoto: "https://images.unsplash.com/photo-1518717758536-85ae29035b6d?w=100&h=100&fit=crop",
-      channel: "IG" as const,
-      status: "Open" as const,
-      location: "Fort Worth, TX",
-      expiresAt: "in 1 day",
-      urgencyLevel: "Critical" as const
-    }
-  ];
+  });
 
   const handleTaskClaim = (taskId: string) => {
+    // For now, use mock volunteer data
+    // In a real implementation, this would come from a form
+    const volunteerEmail = `volunteer${Date.now()}@example.com`;
+    const name = `Volunteer ${Math.floor(Math.random() * 1000)}`;
+    
+    claimTaskMutation.mutate({ taskId, volunteerEmail, name });
     console.log(`Task claimed: ${taskId}`);
   };
 
   const handleTaskComplete = (taskId: string) => {
+    completeTaskMutation.mutate(taskId);
     console.log(`Task completed: ${taskId}`);
   };
 
-  const filteredTasks = mockTasks.filter(task => {
-    const matchesSearch = task.dogName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         task.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesChannel = channelFilter === "all" || task.channel === channelFilter;
-    const matchesLocation = locationFilter === "all" || task.location.includes(locationFilter);
-    return matchesSearch && matchesChannel && matchesLocation;
-  });
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      const dogName = task.dog?.name || '';
+      const matchesSearch = dogName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           task.location.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesChannel = channelFilter === "all" || task.channel === channelFilter;
+      const matchesLocation = locationFilter === "all" || task.location.includes(locationFilter);
+      return matchesSearch && matchesChannel && matchesLocation;
+    });
+  }, [tasks, searchTerm, channelFilter, locationFilter]);
 
   const openTasks = filteredTasks.filter(t => t.status === "Open").length;
-  const urgentTasks = filteredTasks.filter(t => t.urgencyLevel === "Critical").length;
+  const urgentTasks = filteredTasks.filter(t => t.dog?.urgencyLevel === "Critical").length;
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header 
+          isLoggedIn={false}
+          userType="volunteer"
+        />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="w-full max-w-md mx-4">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-accent-foreground" />
+                <span className="text-lg">Loading volunteer tasks...</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header 
+          isLoggedIn={false}
+          userType="volunteer"
+        />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="w-full max-w-md mx-4">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <h2 className="text-lg font-semibold mb-2">Failed to load tasks</h2>
+                <p className="text-muted-foreground">Please try refreshing the page.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -180,11 +217,18 @@ export default function AmplifyBoard() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredTasks
-                .filter(task => task.urgencyLevel === "Critical" && task.status === "Open")
+                .filter(task => task.dog?.urgencyLevel === "Critical" && task.status === "Open")
                 .map(task => (
                   <TaskCard 
                     key={task.id} 
-                    {...task}
+                    id={task.id}
+                    dogName={task.dog?.name || 'Unknown Dog'}
+                    dogPhoto={task.dog?.photoUrl || ''}
+                    channel={task.channel as any}
+                    status={task.status as any}
+                    location={task.location}
+                    expiresAt={task.expiresAt}
+                    urgencyLevel={task.dog?.urgencyLevel as any}
                     onClaim={() => handleTaskClaim(task.id)}
                     onComplete={() => handleTaskComplete(task.id)}
                   />
@@ -200,7 +244,14 @@ export default function AmplifyBoard() {
             {filteredTasks.map(task => (
               <TaskCard 
                 key={task.id} 
-                {...task}
+                id={task.id}
+                dogName={task.dog?.name || 'Unknown Dog'}
+                dogPhoto={task.dog?.photoUrl || ''}
+                channel={task.channel as any}
+                status={task.status as any}
+                location={task.location}
+                expiresAt={task.expiresAt}
+                urgencyLevel={task.dog?.urgencyLevel as any}
                 onClaim={() => handleTaskClaim(task.id)}
                 onComplete={() => handleTaskComplete(task.id)}
               />

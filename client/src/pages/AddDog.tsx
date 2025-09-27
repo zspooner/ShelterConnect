@@ -1,24 +1,64 @@
 import Header from "@/components/Header";
 import DogForm from "@/components/DogForm";
+import { useAuth } from "@/hooks/use-auth";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AddDog() {
-  const mockShelter = {
-    name: "Happy Paws Rescue",
-    email: "contact@happypawsrescue.org"
-  };
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const createDogMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const response = await apiRequest('POST', '/api/dogs', formData);
+      return await response.json();
+    },
+    onSuccess: (dog) => {
+      toast({
+        title: "Dog Added Successfully!",
+        description: `${dog.name} has been added to your shelter.`,
+      });
+      
+      // Redirect to the dog's asset page
+      setTimeout(() => {
+        window.location.href = `/dogs/${dog.id}/assets`;
+      }, 1000);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Add Dog",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleFormSubmit = (data: any) => {
-    console.log('Dog form submitted:', data);
-    // After successful submission, redirect to assets page
-    setTimeout(() => {
-      window.location.href = `/dogs/new-dog-id/assets`;
-    }, 1000);
+    if (!data.photo) {
+      toast({
+        title: "Photo Required",
+        description: "Please select a photo for the dog.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create FormData to handle file upload
+    const formData = new FormData();
+    formData.append('photo', data.photo);
+    
+    // Extract photo from data and stringify the rest
+    const { photo, ...dogData } = data;
+    formData.append('dogData', JSON.stringify(dogData));
+
+    createDogMutation.mutate(formData);
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Header 
-        shelterName={mockShelter.name}
+        shelterName={user?.name || 'Your Shelter'}
         isLoggedIn={true}
         userType="shelter"
       />

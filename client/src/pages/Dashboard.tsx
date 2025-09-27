@@ -1,76 +1,40 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Filter } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Plus, Search, Filter, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import DogCard from "@/components/DogCard";
 import MetricCard from "@/components/MetricCard";
+import { useAuth } from "@/hooks/use-auth";
+
+interface Dog {
+  id: string;
+  name: string;
+  ageYears: number;
+  sex: string;
+  breedGuess?: string;
+  weightLbs: number;
+  photoUrl: string;
+  status: string;
+  euthanasiaRisk: boolean;
+  adoptionDeadline?: string;
+  clickCount: number;
+  inquiryCount: number;
+}
 
 export default function Dashboard() {
-  //todo: remove mock functionality
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { user, isLoading: userLoading } = useAuth();
 
-  const mockShelter = {
-    name: "Happy Paws Rescue",
-    email: "contact@happypawsrescue.org"
-  };
-
-  const mockDogs = [
-    {
-      id: "1",
-      name: "Buddy",
-      ageYears: 3,
-      sex: "Male",
-      breedGuess: "Golden Retriever Mix",
-      weightLbs: 65,
-      photoUrl: "https://images.unsplash.com/photo-1552053831-71594a27632d?w=400&h=300&fit=crop",
-      status: "Available" as const,
-      urgencyLevel: "Critical" as const,
-      adoptionDeadline: "Oct 15",
-      clicks: 24,
-      inquiries: 3
-    },
-    {
-      id: "2",
-      name: "Luna",
-      ageYears: 2,
-      sex: "Female", 
-      breedGuess: "Border Collie",
-      weightLbs: 45,
-      photoUrl: "https://images.unsplash.com/photo-1551717743-49959800b1f6?w=400&h=300&fit=crop",
-      status: "Available" as const,
-      urgencyLevel: "Soon" as const,
-      adoptionDeadline: "Oct 22",
-      clicks: 18,
-      inquiries: 1
-    },
-    {
-      id: "3",
-      name: "Max",
-      ageYears: 5,
-      sex: "Male",
-      breedGuess: "German Shepherd",
-      weightLbs: 75,
-      photoUrl: "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=400&h=300&fit=crop",
-      status: "Adopted" as const,
-      clicks: 42,
-      inquiries: 8
-    },
-    {
-      id: "4",
-      name: "Bella",
-      ageYears: 1,
-      sex: "Female",
-      breedGuess: "Labrador Mix",
-      weightLbs: 35,
-      photoUrl: "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=400&h=300&fit=crop",
-      status: "Hold" as const,
-      clicks: 15,
-      inquiries: 2
-    }
-  ];
+  // Fetch dogs for the authenticated shelter
+  const { data: dogs = [], isLoading: dogsLoading, error } = useQuery<Dog[]>({
+    queryKey: ['/api/dogs'],
+    enabled: !!user,
+  });
 
   const handleAddDog = () => {
     console.log('Add dog clicked');
@@ -82,16 +46,69 @@ export default function Dashboard() {
     window.location.href = `/dogs/${dogId}/assets`;
   };
 
-  const filteredDogs = mockDogs.filter(dog => {
+  // Calculate urgency level for each dog
+  const dogsWithUrgency = useMemo(() => {
+    return dogs.map(dog => {
+      let urgencyLevel = "None";
+      if (dog.euthanasiaRisk) {
+        urgencyLevel = "Critical";
+      } else if (dog.adoptionDeadline) {
+        const deadline = new Date(dog.adoptionDeadline);
+        const now = new Date();
+        const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntil <= 7) urgencyLevel = "Soon";
+      }
+      return { ...dog, urgencyLevel };
+    });
+  }, [dogs]);
+
+  const filteredDogs = dogsWithUrgency.filter(dog => {
     const matchesSearch = dog.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || dog.status.toLowerCase() === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
+  // Calculate metrics
+  const totalClicks = dogs.reduce((sum, dog) => sum + dog.clickCount, 0);
+  const totalInquiries = dogs.reduce((sum, dog) => sum + dog.inquiryCount, 0);
+  const urgentDogs = dogsWithUrgency.filter((d: any) => d.urgencyLevel === "Critical").length;
+
+  // Show loading state
+  if (userLoading || dogsLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="h-6 w-6 animate-spin text-accent-foreground" />
+              <span className="text-lg">Loading dashboard...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <h2 className="text-lg font-semibold mb-2">Failed to load dashboard</h2>
+              <p className="text-muted-foreground">Please try refreshing the page.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header 
-        shelterName={mockShelter.name}
+        shelterName={user?.name || 'Your Shelter'}
         isLoggedIn={true}
         userType="shelter"
       />
@@ -115,29 +132,23 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="Total Dogs"
-            value={mockDogs.length}
+            value={dogs.length}
             description="Active profiles"
           />
           <MetricCard
             title="Total Views"
-            value="1,234"
-            description="Last 7 days"
-            trend="up"
-            trendValue="+12%"
+            value={totalClicks}
+            description="All time"
           />
           <MetricCard
             title="Inquiries"
-            value="14"
-            description="This week"
-            trend="up"
-            trendValue="+3"
+            value={totalInquiries}
+            description="All time"
           />
           <MetricCard
             title="Urgent Dogs"
-            value={mockDogs.filter(d => d.urgencyLevel === "Critical").length}
+            value={urgentDogs}
             description="Need immediate help"
-            trend="down"
-            trendValue="-1"
           />
         </div>
 
@@ -172,7 +183,18 @@ export default function Dashboard() {
           {filteredDogs.map(dog => (
             <DogCard 
               key={dog.id} 
-              {...dog} 
+              id={dog.id}
+              name={dog.name}
+              ageYears={dog.ageYears}
+              sex={dog.sex}
+              breedGuess={dog.breedGuess}
+              weightLbs={dog.weightLbs}
+              photoUrl={dog.photoUrl}
+              status={dog.status as any}
+              urgencyLevel={dog.urgencyLevel as any}
+              adoptionDeadline={dog.adoptionDeadline}
+              clicks={dog.clickCount}
+              inquiries={dog.inquiryCount}
               onClick={() => handleDogClick(dog.id)}
             />
           ))}
