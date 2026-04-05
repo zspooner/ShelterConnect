@@ -59,22 +59,22 @@ const generateSlug = (name: string): string => {
 const sampleShelters = [
   {
     name: "Happy Tails Animal Rescue",
-    email: "admin@happytails.org", 
-    password: "SecurePass123!",
+    email: "admin@happytails.org",
+    password: crypto.randomBytes(32).toString('hex'),
     city: "Austin",
     state: "Texas"
   },
   {
     name: "Paws & Hearts Shelter",
     email: "contact@pawshearts.org",
-    password: "SafePassword456!",
-    city: "Portland", 
+    password: crypto.randomBytes(32).toString('hex'),
+    city: "Portland",
     state: "Oregon"
   },
   {
     name: "Second Chance Animal Sanctuary",
     email: "info@secondchance.org",
-    password: "StrongPass789!",
+    password: crypto.randomBytes(32).toString('hex'),
     city: "Denver",
     state: "Colorado"
   }

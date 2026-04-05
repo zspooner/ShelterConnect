@@ -356,7 +356,12 @@ export const enhanceFileUploadSecurity = () => {
 export const enhanceSessionSecurity = () => {
   return {
     name: 'sessionId', // Don't use default session name
-    secret: process.env.SESSION_SECRET || 'super-secret-change-in-production',
+    secret: (() => {
+      if (!process.env.SESSION_SECRET) {
+        throw new Error('SESSION_SECRET environment variable is required');
+      }
+      return process.env.SESSION_SECRET;
+    })(),
     resave: false,
     saveUninitialized: false,
     rolling: true, // Reset expiration on activity

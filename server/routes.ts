@@ -66,7 +66,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper function to hash IP for privacy
   const hashIP = (ip: string): string => {
-    const salt = process.env.SESSION_SECRET || 'default-salt';
+    if (!process.env.SESSION_SECRET) {
+      throw new Error('SESSION_SECRET environment variable is required');
+    }
+    const salt = process.env.SESSION_SECRET;
     return crypto.createHash('sha256').update(ip + salt).digest('hex');
   };
 
@@ -506,7 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DEVELOPMENT UTILITIES
 
   // POST /api/seed-data - Initialize database with sample data (development only)
-  app.post('/api/seed-data', async (req, res) => {
+  app.post('/api/seed-data', requireAuth, async (req, res) => {
     try {
       if (process.env.NODE_ENV === 'production') {
         return res.status(403).json({ error: 'Seeding not allowed in production' });
@@ -530,11 +533,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/health - Health check endpoint (not rate limited)
   app.get('/health', (req, res) => {
-    res.json({ 
-      status: 'healthy', 
+    res.json({
+      status: 'healthy',
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development'
     });
   });
   
